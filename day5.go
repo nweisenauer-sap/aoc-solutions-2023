@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type day5 struct {
@@ -110,13 +111,26 @@ type Almanac struct {
 func (a *Almanac) findLowestFinalMapValue() int {
 	lowestValue := math.MaxInt64
 	lowestValues := make(chan int, len(a.seeds))
-
+	expectedResultCount := 0
+	segmentSize := 1000000
 	for startSeed, rangeSize := range a.seeds {
-		go func(startSeed int, rangeSize int) {
-			lowestValues <- a.findLowestFinalMapValueForSegment(startSeed, rangeSize)
-		}(startSeed, rangeSize)
+		if rangeSize >= segmentSize {
+			for i := 0; i < rangeSize; i += segmentSize {
+				expectedResultCount++
+				go func(startSeed int, rangeSize int) {
+					lowestValues <- a.findLowestFinalMapValueForSegment(startSeed, rangeSize)
+				}(startSeed+i, segmentSize)
+			}
+		}
+		remainder := rangeSize % segmentSize
+		if remainder > 0 {
+			expectedResultCount++
+			go func(startSeed int, rangeSize int) {
+				lowestValues <- a.findLowestFinalMapValueForSegment(startSeed, rangeSize)
+			}(startSeed+rangeSize-remainder, remainder)
+		}
 	}
-	for i := 0; i < len(a.seeds); i++ {
+	for i := 0; i < expectedResultCount; i++ {
 		nextLowestValue := <-lowestValues
 		if nextLowestValue < lowestValue {
 			lowestValue = nextLowestValue
@@ -179,6 +193,9 @@ func day5Part1() string {
 
 func day5Part2() string {
 	fmt.Println("Please be patient, this takes up to a minute to run ...")
+	defer func(start time.Time) {
+		fmt.Println("Computation Time:", time.Since(start))
+	}(time.Now())
 	d := day5{
 		input: "input/day5_input.txt",
 		almanac: Almanac{
